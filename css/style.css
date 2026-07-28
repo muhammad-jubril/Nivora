@@ -50,6 +50,7 @@ body {
 .app {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
@@ -82,6 +83,7 @@ body {
   top: 0;
   left: 0;
   height: 100vh;
+  height: 100dvh;
   z-index: 40;
   transform: translateX(-100%);
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
@@ -232,8 +234,6 @@ body {
   min-width: 0;
 }
 
-
-
 .view {
   display: none;
   flex-direction: column;
@@ -367,7 +367,7 @@ body {
 /* ---- Composer ---- */
 
 .composer {
-  padding: 16px 24px 22px;
+  padding: 16px 24px calc(22px + env(safe-area-inset-bottom));
   display: flex;
   justify-content: center;
 }
