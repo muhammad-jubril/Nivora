@@ -3,7 +3,7 @@ const { checkRateLimit } = require("./_rateLimit");
 const RATE_LIMIT = 6; // requests
 const RATE_WINDOW_MS = 60 * 1000; // per 1 minute, per IP
 
-const MODEL = "gemini-2.5-flash-image";
+const MODEL = "gemini-3.5-flash-image";
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
