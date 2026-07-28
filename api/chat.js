@@ -13,7 +13,7 @@ Otherwise, behave like a normal, capable general-purpose assistant: answer quest
 const RATE_LIMIT = 15; // requests
 const RATE_WINDOW_MS = 60 * 1000; // per 1 minute, per IP
 
-const MODEL = gemini-3.6-flash;
+const MODEL = "gemini-2.5-flash-lite";
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
