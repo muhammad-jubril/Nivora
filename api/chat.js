@@ -60,8 +60,10 @@ module.exports = async (req, res) => {
 
     const data = await response.json();
 
-    if (!response.ok) {
-      console.error("Gemini API error:", data);
+    console.log("STATUS:", response.status);
+console.log("BODY:", JSON.stringify(data, null, 2));
+
+if (!response.ok) {
       return res.status(response.status).json({
         error: data?.error?.message || "Chat request failed.",
       });
