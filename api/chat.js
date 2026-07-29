@@ -4,7 +4,7 @@ const NOVA_SYSTEM_PROMPT = `You are Nova, an AI assistant created by MJ. You are
 
 Identity rules (always follow these):
 - If asked who you are, what you are, or to introduce yourself, say you're Nova, an AI assistant, briefly describe what you can help with (chat and image generation), and mention you were created by MJ.
-- If asked who made you, who created you, what company built you, or similar, say you were created by MJ. Never say you are Gemini, GPT, Claude, or any other underlying model, and never mention Google, OpenAI, Anthropic, or any AI lab.
+- If asked who made you, who created you, what company built you, or similar, say you were created by MJ. Never say you are Llama, Groq, GPT, Claude, Gemini, or any other underlying model, and never mention Meta, Groq, OpenAI, Anthropic, Google, or any AI lab.
 - If asked what you're built on/powered by at a technical level, you can say you're powered by advanced language model technology, without naming a specific company or model.
 - Stay in character as Nova consistently, across the whole conversation, not just the first message.
 
@@ -13,7 +13,7 @@ Otherwise, behave like a normal, capable general-purpose assistant: answer quest
 const RATE_LIMIT = 15; // requests
 const RATE_WINDOW_MS = 60 * 1000; // per 1 minute, per IP
 
-const MODEL = "gemini-2.0-flash";
+const MODEL = "llama-3.3-70b-versatile";
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
@@ -34,45 +34,41 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: "messages array is required" });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       return res.status(500).json({
-        error: "Server is missing GEMINI_API_KEY. Add it in your Vercel project's Environment Variables.",
+        error: "Server is missing GROQ_API_KEY. Add it in your Vercel project's Environment Variables.",
       });
     }
 
-    // Gemini uses "user" / "model" roles, and a separate system_instruction field.
-    const contents = messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+    // Groq uses the OpenAI-style chat format: a flat messages array,
+    // with the system prompt as its own message at the start.
+    const groqMessages = [
+      { role: "system", content: NOVA_SYSTEM_PROMPT },
+      ...messages.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+    ];
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: NOVA_SYSTEM_PROMPT }] },
-          contents,
-        }),
-      }
-    );
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: groqMessages,
+      }),
+    });
 
     const data = await response.json();
 
-    console.log("STATUS:", response.status);
-console.log("BODY:", JSON.stringify(data, null, 2));
-
-if (!response.ok) {
+    if (!response.ok) {
+      console.error("Groq API error:", data);
       return res.status(response.status).json({
         error: data?.error?.message || "Chat request failed.",
       });
     }
 
-    const text = (data.candidates?.[0]?.content?.parts || [])
-      .map((p) => p.text || "")
-      .join("\n")
-      .trim();
+    const text = data.choices?.[0]?.message?.content?.trim();
 
     res.status(200).json({ reply: text || "I couldn't generate a response — try again." });
   } catch (err) {
