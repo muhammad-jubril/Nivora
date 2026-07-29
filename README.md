@@ -1,49 +1,27 @@
-# Nova — Powered by MJ
+# Nivora — Built by MJ
 
-A branded AI assistant: chat + image generation, built on Google's Gemini API
-(both chat and images, using the free tier), wrapped in your own product and
-UI. Users never see "Gemini," "Google," or any other AI lab — Nova always
-identifies itself as created by MJ.
+A branded AI assistant: chat + image generation, built on **Groq** (chat) and
+**Pollinations.ai** (images) — both genuinely free, no credit card, ever.
+Wrapped in your own product and UI. Users never see "Groq," "Llama,"
+"Pollinations," or any other AI lab — Nivora always identifies itself as
+created by MJ.
 
 ## What's inside
+## Getting your API key (Groq — free, no card, ever)
 
-```
-nova/
-├── api/             Serverless functions — hold your API key, talk to Gemini
-│   ├── chat.js
-│   └── image.js
-├── index.html       Nova's interface
-├── css/style.css
-├── js/script.js
-└── package.json
-```
+1. Go to **https://console.groq.com** and sign up with an email
+2. Click **"API Keys"** in the sidebar
+3. Click **"Create API Key"**, name it, copy it — starts with `gsk_...`
 
-The frontend never calls Gemini directly — it only ever talks to `/api/chat`
-and `/api/image` on your own domain, which hold the real API key
-server-side. Never put API keys in frontend code — anyone could steal them.
+That's the only key you need. **Image generation needs no key at all** — it
+uses Pollinations.ai, which is open with no signup.
 
-## Getting your API key (free, no credit card)
-
-1. Go to **https://aistudio.google.com** and sign in with a Google account
-2. Click **"Get API key"** (usually top-left or under a key icon)
-3. Click **"Create API key"**
-4. Copy it — this one key works for both chat and images
-
-That's it — no billing setup required for the free tier this project uses.
-
-**Free tier limits** (as of when this was written — Google can change these):
-- Chat (`gemini-2.5-flash`): generous daily request limits, no card
-- Images (`gemini-2.5-flash-image`, aka "Nano Banana"): up to ~500 images/day,
-  no card
-
-If you ever outgrow these limits, Google's paid tier is also usage-based
-(pay only for what you use above free quota) — but for a portfolio project
-or moderate traffic, the free tier should comfortably cover you.
-
-One thing worth knowing: on the free tier, Google may use your prompts to
-improve their models (this is disclosed in their terms). Their paid tier
-turns this off. Worth keeping in mind if you or users ever put sensitive
-info into Nova.
+**Free tier limits** (as of when this was written):
+- Chat (Groq, Llama 3.3 70B): ~14,400 requests/day, 30/minute — very generous
+- Images (Pollinations): shared anonymous access, roughly 1 request per 15
+  seconds across all anonymous users — this is the one soft spot; if it ever
+  feels slow, Pollinations also offers a free registered tier with higher
+  limits (still no payment) — see pollinations.ai
 
 ## Running it locally (before deploying)
 
@@ -51,85 +29,61 @@ info into Nova.
 2. Install the Vercel CLI: `npm install -g vercel`
 3. From the project folder, run: `vercel dev`
 4. Add a `.env` file in the project root with:
-   ```
-   GEMINI_API_KEY=your_key_here
-   ```
 5. Open the local URL it gives you (usually http://localhost:3000)
 
 ## Deploying: GitHub → Vercel, step by step
 
 **1. Push the project to GitHub**
-   - Create a new repository on https://github.com/new (keep it private if
-     you're not ready for the public to see the code)
-   - In the project folder, run:
-     ```
-     git init
-     git add .
-     git commit -m "Nova, powered by MJ"
-     git branch -M main
-     git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-     git push -u origin main
-     ```
+- Create a new repository on https://github.com/new
+- Push this project's files to it (via `git`, or by hand through GitHub's
+  web "Create new file" if you're on mobile)
 
 **2. Import the project into Vercel**
-   - Go to https://vercel.com and sign in (you can sign in with your GitHub
-     account directly)
-   - Click "Add New" → "Project"
-   - Select the GitHub repository you just pushed
-   - Vercel will auto-detect it as a Node project — you don't need to change
-     any build settings
+- Go to https://vercel.com, sign in with GitHub
+- Click "Add New" → "Project" → select your repo → "Import"
 
 **3. Add your API key before deploying**
-   - In the import screen (or later under Project → Settings →
-     Environment Variables), add:
-     - `GEMINI_API_KEY` → your Gemini key from AI Studio
-   - Make sure it's added for "Production" (and "Preview" if you want
-     preview deployments to work too)
+- Under "Environment Variables," add:
+  - `GROQ_API_KEY` → your Groq key
+- Make sure it's added for "Production"
 
 **4. Deploy**
-   - Click "Deploy"
-   - Vercel gives you a live URL like `nova-powered-by-mj.vercel.app` — that's
-     it, it's live
+- Click "Deploy" — you'll get a live link like `nivora-ai.vercel.app`
 
 **5. Future updates**
-   - Any time you push new commits to the `main` branch on GitHub, Vercel
-     automatically redeploys — no manual steps needed after the first setup
-
-**6. Optional: custom domain**
-   - Under Project → Settings → Domains, you can attach your own domain
-     (e.g. `nova.yourname.com`) instead of the vercel.app one
+- Any push to `main` on GitHub automatically redeploys
 
 ## Rate limiting
 
 Both `/api/chat` and `/api/image` limit each visitor (by IP) to:
 - **Chat:** 15 messages per minute
-- **Images:** 6 generations per minute
+- **Images:** 4 generations per minute (kept modest since Pollinations'
+free anonymous tier is itself shared and rate-limited)
 
-This isn't just about cost now — it also protects your free daily quota from
-being burned through by one heavy user or a bot, so the app keeps working for
-everyone else. Honest caveat: this uses in-memory counting per serverless
-instance, so it's not perfectly precise under heavy simultaneous traffic, but
-it stops realistic abuse for a portfolio-scale project. You can adjust the
+This protects your free daily quota from being burned through by one heavy
+user or a bot. Honest caveat: this uses in-memory counting per serverless
+instance, so it's not perfectly precise under heavy simultaneous traffic,
+but it stops realistic abuse for a portfolio-scale project. Adjust the
 numbers at the top of `api/chat.js` and `api/image.js`.
 
-## How the "Nova, by MJ" identity works
+## How the "Nivora, by MJ" identity works
 
-Every request to `/api/chat` sends a system instruction telling Gemini to
-behave as "Nova," created by MJ, and never reveal the underlying model or
-company. This is normal — most AI-powered products work this way under the
-hood.
+Every request to `/api/chat` sends a system prompt telling the model to
+behave as "Nivora," created by MJ, describe itself when asked "who are you,"
+and never reveal the underlying model or company. This is normal — most
+AI-powered products work this way under the hood.
 
 ## Customizing
 
-- **Colors/branding:** edit the CSS variables at the top of `css/style.css`
-  (there's a light theme and dark theme block)
-- **Nova's personality/behavior:** edit `NOVA_SYSTEM_PROMPT` in `api/chat.js`
+- **Colors/branding:** CSS variables at the top of `css/style.css` (light +
+dark theme blocks)
+- **Nivora's personality/behavior:** `NIVORA_SYSTEM_PROMPT` in `api/chat.js`
 - **WhatsApp bug report number:** `WHATSAPP_NUMBER` in `js/script.js`
+- **Image style/size:** adjust the query params in `api/image.js`
 
 ## Next steps (not included yet)
 
 - User accounts + saved chat history (e.g. via Supabase or Firebase)
-- Custom domain (see step 6 above)
-- If this ever needs a paid, higher tier: swap in Anthropic or OpenAI later
-  the same way this was swapped to Gemini — the `/api` structure stays the
-  same either way
+- Custom domain (Vercel → Project → Settings → Domains)
+- If this ever needs a higher, paid tier: swap in another provider later —
+the `/api` structure stays the same either way
