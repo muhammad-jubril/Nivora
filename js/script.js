@@ -4,7 +4,7 @@
 const WHATSAPP_NUMBER = "2349167875697";
 
 // ---------- State ----------
-const CHAT_STORAGE_KEY = "nova-chat-history";
+const CHAT_STORAGE_KEY = "nivora-chat-history";
 let chatHistory = [];
 
 // ---------- Elements ----------
@@ -45,7 +45,7 @@ newChatBtn.addEventListener("click", () => {
   messagesEl.innerHTML = `
     <div class="empty-state">
       <div class="empty-glow"></div>
-      <h1>Nova</h1>
+      <h1>Nivora</h1>
       <p>Ask me anything — I'm here to help.</p>
     </div>`;
 });
@@ -97,7 +97,7 @@ function addThinkingBubble() {
   clearEmptyState(messagesEl);
   const row = document.createElement("div");
   row.className = "msg-row assistant";
-  row.innerHTML = `<div class="msg-wrap"><div class="bubble thinking-bubble"><span class="thinking-label">Nova is thinking</span><div class="thinking"><span></span><span></span><span></span></div></div></div>`;
+  row.innerHTML = `<div class="msg-wrap"><div class="bubble thinking-bubble"><span class="thinking-label">Nivora is thinking</span><div class="thinking"><span></span><span></span><span></span></div></div></div>`;
   messagesEl.appendChild(row);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return row;
@@ -240,7 +240,7 @@ function applyTheme(pref) {
 }
 
 function setTheme(pref) {
-  localStorage.setItem("nova-theme", pref);
+  localStorage.setItem("nivora-theme", pref);
   applyTheme(pref);
 }
 
@@ -249,16 +249,16 @@ themeButtons.forEach((btn) => {
 });
 
 systemMedia.addEventListener("change", () => {
-  const current = localStorage.getItem("nova-theme") || "dark";
+  const current = localStorage.getItem("nivora-theme") || "dark";
   if (current === "system") applyTheme("system");
 });
 
 // Restore saved preference (defaults to dark)
-setTheme(localStorage.getItem("nova-theme") || "dark");
+setTheme(localStorage.getItem("nivora-theme") || "dark");
 
 // ---------- Report a bug ----------
 document.getElementById("reportBugBtn").addEventListener("click", () => {
-  const message = encodeURIComponent("Hi, I found a bug in Nova:");
+  const message = encodeURIComponent("Hi, I found a bug in Nivora:");
   window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${message}`, "_blank");
 });
 
@@ -332,7 +332,7 @@ async function startRecording() {
         } catch (err) {
           addMessage("assistant", "Couldn't reach the server. Is it running?");
         } finally {
-          chatInput.placeholder = "Message Nova...";
+          chatInput.placeholder = "Message Nivora...";
           micBtn.disabled = false;
         }
       };
@@ -358,6 +358,16 @@ micBtn.addEventListener("click", () => {
   } else {
     startRecording();
   }
+});
+
+// ---------- Splash screen ----------
+window.addEventListener("load", () => {
+  const splash = document.getElementById("splashScreen");
+  if (!splash) return;
+  setTimeout(() => {
+    splash.classList.add("hide");
+    setTimeout(() => splash.remove(), 450);
+  }, 900);
 });
 
 // ---------- Restore chat history on load ----------
