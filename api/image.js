@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: "Image request failed — try again in a moment.",
+        error: "Something went wrong. Please try again.",
       });
     }
 
@@ -44,6 +44,6 @@ module.exports = async (req, res) => {
     res.status(200).json({ b64 });
   } catch (err) {
     console.error("Image error:", err);
-    res.status(500).json({ error: "Unexpected server error." });
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 };
