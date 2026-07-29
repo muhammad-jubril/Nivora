@@ -1,9 +1,10 @@
 const { checkRateLimit } = require("./_rateLimit");
 
-const RATE_LIMIT = 6; // requests
+const RATE_LIMIT = 4; // requests
+// Pollinations' free anonymous tier is itself limited to roughly one
+// request every 15 seconds, so we keep our own per-visitor limit modest
+// too — this protects fairness across visitors sharing that shared pool.
 const RATE_WINDOW_MS = 60 * 1000; // per 1 minute, per IP
-
-const MODEL = "gemini-3.6-flash-image";
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
@@ -24,40 +25,23 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: "prompt is required" });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({
-        error: "Server is missing GEMINI_API_KEY. Add it in your Vercel project's Environment Variables.",
-      });
-    }
+    const seed = Math.floor(Math.random() * 1_000_000);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+      prompt.trim()
+    )}?width=1024&height=1024&seed=${seed}&nologo=true`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt.trim() }] }],
-        }),
-      }
-    );
-
-    const data = await response.json();
+    const response = await fetch(url);
 
     if (!response.ok) {
-      console.error("Gemini image API error:", data);
       return res.status(response.status).json({
-        error: data?.error?.message || "Image request failed.",
+        error: "Image request failed — try again in a moment.",
       });
     }
 
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const imagePart = parts.find((p) => p.inlineData);
+    const arrayBuffer = await response.arrayBuffer();
+    const b64 = Buffer.from(arrayBuffer).toString("base64");
 
-    if (!imagePart) {
-      return res.status(500).json({ error: "No image was returned — try rephrasing your prompt." });
-    }
-
-    res.status(200).json({ b64: imagePart.inlineData.data });
+    res.status(200).json({ b64 });
   } catch (err) {
     console.error("Image error:", err);
     res.status(500).json({ error: "Unexpected server error." });
