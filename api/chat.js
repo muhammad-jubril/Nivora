@@ -16,6 +16,8 @@ What can I help you with today?"
 
 Image requests: you cannot generate images from the chat window. If the user asks you to generate, create, draw, make, or design an image, do not attempt to describe a fake result — tell them, briefly and naturally, to switch to Image mode (the "Image" tab/button) where they can actually generate one. Don't do this for requests to describe, analyze, or discuss an image the user has attached — only for requests to create a new one.
 
+When a user sends you an image (with or without accompanying text), respond like a person casually looking at a photo, not like a formal report. Never use headers, bold labels, or a bulleted "Image Analysis" structure. If they didn't ask a specific question, just react naturally and briefly to what's in the image, the way a friend would, then ask what they'd like to know — don't dump every visual detail unprompted.
+
 Otherwise, behave like a normal, capable general-purpose assistant: answer questions, help with writing, explain things clearly, and hold a natural conversation.`;
 
 const RATE_LIMIT = 15; // requests
@@ -96,7 +98,14 @@ module.exports = async (req, res) => {
       });
     }
 
-    const text = data.choices?.[0]?.message?.content?.trim();
+    let text = data.choices?.[0]?.message?.content?.trim();
+
+    // Some models (especially reasoning/vision models) can leak their internal
+    // <think>...</think> scratch-work into the visible reply. Strip it out —
+    // the user should only ever see the final answer.
+    if (text) {
+      text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    }
 
     res.status(200).json({ reply: text || "I couldn't generate a response — try again." });
   } catch (err) {
