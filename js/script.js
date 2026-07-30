@@ -27,6 +27,9 @@ const attachPreview = document.getElementById("attachPreview");
 const micBtn = document.getElementById("micBtn");
 
 let attachedImage = null; // base64 data URL, or null
+let currentController = null; // AbortController for the in-flight chat request
+let isTyping = false; // whether the typewriter reveal is currently animating
+let skipTypewriter = false;
 
 // ---------- Mode switching ----------
 modeButtons.forEach((btn) => {
@@ -74,6 +77,38 @@ function saveHistory() {
   }
 }
 
+function renderMarkdown(text) {
+  if (typeof marked === "undefined" || typeof DOMPurify === "undefined") return text;
+  return DOMPurify.sanitize(marked.parse(text));
+}
+
+function addCopyButton(bubble, getText) {
+  const btn = document.createElement("button");
+  btn.className = "copy-btn";
+  btn.type = "button";
+  btn.setAttribute("aria-label", "Copy message");
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
+  btn.addEventListener("click", () => {
+    navigator.clipboard.writeText(getText()).then(() => {
+      btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+      setTimeout(() => {
+        btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
+      }, 1500);
+    });
+  });
+  bubble.parentElement.appendChild(btn);
+}
+
+function addRegenerateButton(row) {
+  document.querySelectorAll(".regenerate-btn").forEach((b) => b.remove());
+  const btn = document.createElement("button");
+  btn.className = "regenerate-btn";
+  btn.type = "button";
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v6h-6"/></svg> Regenerate`;
+  btn.addEventListener("click", regenerateLast);
+  row.querySelector(".msg-wrap").appendChild(btn);
+}
+
 function addMessage(role, text, imageDataUrl) {
   clearEmptyState(messagesEl);
   const row = document.createElement("div");
@@ -83,7 +118,13 @@ function addMessage(role, text, imageDataUrl) {
     : "";
   row.innerHTML = `<div class="msg-wrap"><div class="bubble">${imgHtml}</div></div>`;
   const bubble = row.querySelector(".bubble");
-  if (text) {
+  if (role === "assistant") {
+    const span = document.createElement("span");
+    span.className = "bubble-text";
+    if (text) span.innerHTML = renderMarkdown(text);
+    bubble.appendChild(span);
+    if (text) addCopyButton(bubble, () => text);
+  } else if (text) {
     const textNode = document.createElement("span");
     textNode.textContent = text;
     bubble.appendChild(textNode);
@@ -91,6 +132,33 @@ function addMessage(role, text, imageDataUrl) {
   messagesEl.appendChild(row);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return row;
+}
+
+async function typewriterReveal(span, fullText) {
+  isTyping = true;
+  skipTypewriter = false;
+  const chunkSize = 3;
+  let i = 0;
+  await new Promise((resolve) => {
+    const interval = setInterval(() => {
+      if (skipTypewriter) {
+        span.textContent = fullText;
+        clearInterval(interval);
+        isTyping = false;
+        resolve();
+        return;
+      }
+      i += chunkSize;
+      span.textContent = fullText.slice(0, i);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      if (i >= fullText.length) {
+        clearInterval(interval);
+        isTyping = false;
+        resolve();
+      }
+    }, 15);
+  });
+  span.innerHTML = renderMarkdown(fullText);
 }
 
 function addThinkingBubble() {
@@ -103,19 +171,16 @@ function addThinkingBubble() {
   return row;
 }
 
-async function sendChat() {
-  const text = chatInput.value.trim();
-  if (!text && !attachedImage) return;
+function setSendingUI(sending) {
+  sendBtn.innerHTML = sending
+    ? `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>`
+    : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+  sendBtn.setAttribute("aria-label", sending ? "Stop" : "Send");
+}
 
-  const imageToSend = attachedImage;
-  chatInput.value = "";
-  autoResize(chatInput);
-  clearAttachment();
-  sendBtn.disabled = true;
-
-  addMessage("user", text, imageToSend);
-  chatHistory.push({ role: "user", content: text || "(sent an image)" });
-  saveHistory();
+async function performChatRequest(messagesForRequest, imageToSend) {
+  setSendingUI(true);
+  currentController = new AbortController();
 
   const thinkingRow = addThinkingBubble();
 
@@ -123,7 +188,8 @@ async function sendChat() {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: chatHistory, image: imageToSend || undefined }),
+      body: JSON.stringify({ messages: messagesForRequest, image: imageToSend || undefined }),
+      signal: currentController.signal,
     });
     const data = await res.json();
 
@@ -132,24 +198,87 @@ async function sendChat() {
     if (!res.ok) {
       addMessage("assistant", "Something went wrong. Please try again.");
     } else {
-      addMessage("assistant", data.reply);
+      const row = addMessage("assistant", "");
+      const span = row.querySelector(".bubble-text");
+      const bubble = row.querySelector(".bubble");
+      await typewriterReveal(span, data.reply);
+      addCopyButton(bubble, () => data.reply);
+      addRegenerateButton(row);
       chatHistory.push({ role: "assistant", content: data.reply });
       saveHistory();
     }
   } catch (err) {
     thinkingRow.remove();
-    addMessage("assistant", "Couldn't reach the server. Is it running?");
+    if (err.name === "AbortError") {
+      addMessage("assistant", "Stopped.");
+    } else {
+      addMessage("assistant", "Couldn't reach the server. Is it running?");
+    }
   } finally {
-    sendBtn.disabled = false;
+    setSendingUI(false);
+    currentController = null;
   }
 }
 
-sendBtn.addEventListener("click", sendChat);
+async function regenerateLast() {
+  if (currentController || isTyping) return;
+  // Drop the last assistant reply from history and the UI, then re-ask.
+  if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "assistant") {
+    chatHistory.pop();
+    saveHistory();
+  }
+  document.querySelectorAll(".regenerate-btn").forEach((b) => b.remove());
+  const rows = messagesEl.querySelectorAll(".msg-row.assistant");
+  if (rows.length) rows[rows.length - 1].remove();
+
+  await performChatRequest(chatHistory, null);
+}
+
+async function sendChat() {
+  if (currentController || isTyping) return; // already busy — ignore extra submits
+
+  const text = chatInput.value.trim();
+  if (!text && !attachedImage) return;
+
+  const imageToSend = attachedImage;
+  chatInput.value = "";
+  autoResize(chatInput);
+  clearAttachment();
+
+  addMessage("user", text, imageToSend);
+  chatHistory.push({ role: "user", content: text || "(sent an image)" });
+  saveHistory();
+
+  await performChatRequest(chatHistory, imageToSend);
+}
+
+function handleSendButtonClick() {
+  if (currentController) {
+    currentController.abort();
+    return;
+  }
+  if (isTyping) {
+    skipTypewriter = true;
+    return;
+  }
+  sendChat();
+}
+
+sendBtn.addEventListener("click", handleSendButtonClick);
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     sendChat();
   }
+});
+
+// ---------- Prompt chips ----------
+document.querySelectorAll(".prompt-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    chatInput.value = chip.textContent;
+    autoResize(chatInput);
+    sendChat();
+  });
 });
 
 // ---------- Image generation ----------
@@ -359,6 +488,15 @@ micBtn.addEventListener("click", () => {
     startRecording();
   }
 });
+
+// ---------- PWA service worker ----------
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Non-critical — the app still works fine without it, just not installable.
+    });
+  });
+}
 
 // ---------- Splash screen ----------
 window.addEventListener("load", () => {
