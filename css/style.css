@@ -315,6 +315,113 @@ body {
   margin: 0;
 }
 
+.prompt-chips {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.prompt-chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.prompt-chip:hover {
+  border-color: var(--primary);
+  background: var(--panel-light);
+}
+
+/* ---- Rendered markdown inside assistant bubbles ---- */
+
+.bubble-text p {
+  margin: 0 0 10px;
+}
+
+.bubble-text p:last-child {
+  margin-bottom: 0;
+}
+
+.bubble-text ul, .bubble-text ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.bubble-text code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85em;
+}
+
+.bubble-text pre {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 0 0 10px;
+}
+
+.bubble-text pre code {
+  background: none;
+  padding: 0;
+}
+
+.bubble-text a {
+  color: var(--primary);
+}
+
+/* ---- Copy + regenerate buttons ---- */
+
+.copy-btn {
+  margin-top: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.copy-btn:hover {
+  background: var(--panel-light);
+  color: var(--text);
+}
+
+.regenerate-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.regenerate-btn:hover {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
 /* ---- Messages ---- */
 
 .messages {
@@ -356,10 +463,15 @@ body {
   margin: 0 auto;
   width: 100%;
   display: flex;
+  flex-direction: column;
 }
 
 .msg-row.user .msg-wrap {
-  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.msg-row.assistant .msg-wrap {
+  align-items: flex-start;
 }
 
 .bubble {
