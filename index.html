@@ -12,6 +12,18 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0a0a0b" />
+<meta property="og:title" content="Nivora — Built by MJ" />
+<meta property="og:description" content="A conversational AI assistant that chats and generates images, built by MJ." />
+<meta property="og:image" content="og-image.png" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Nivora — Built by MJ" />
+<meta name="twitter:description" content="A conversational AI assistant that chats and generates images, built by MJ." />
+<meta name="twitter:image" content="og-image.png" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.5/purify.min.js"></script>
 </head>
 <body data-theme="dark">
 
@@ -93,6 +105,12 @@
             <div class="empty-glow"></div>
             <h1>Nivora</h1>
             <p>Ask me anything — I'm here to help.</p>
+            <div class="prompt-chips">
+              <button type="button" class="prompt-chip">Explain quantum computing simply</button>
+              <button type="button" class="prompt-chip">Write a short poem about the ocean</button>
+              <button type="button" class="prompt-chip">Help me debug some code</button>
+              <button type="button" class="prompt-chip">Give me a fun fact</button>
+            </div>
           </div>
         </div>
 
