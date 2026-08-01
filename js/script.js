@@ -30,6 +30,14 @@ let attachedImage = null; // base64 data URL, or null
 let currentController = null; // AbortController for the in-flight chat request
 let isTyping = false; // whether the typewriter reveal is currently animating
 let skipTypewriter = false;
+let lastFailedRequest = null; // { messages, image } for the retry button
+
+// ---------- Haptics ----------
+function vibrate(ms) {
+  if (navigator.vibrate) {
+    try { navigator.vibrate(ms); } catch (err) {}
+  }
+}
 
 // ---------- Mode switching ----------
 modeButtons.forEach((btn) => {
@@ -45,12 +53,20 @@ modeButtons.forEach((btn) => {
 newChatBtn.addEventListener("click", () => {
   chatHistory = [];
   localStorage.removeItem(CHAT_STORAGE_KEY);
+  window.speechSynthesis?.cancel();
   messagesEl.innerHTML = `
     <div class="empty-state">
       <div class="empty-glow"></div>
       <h1>Nivora</h1>
       <p>Ask me anything — I'm here to help.</p>
+      <div class="prompt-chips">
+        <button type="button" class="prompt-chip">Explain quantum computing simply</button>
+        <button type="button" class="prompt-chip">Write a short poem about the ocean</button>
+        <button type="button" class="prompt-chip">Help me debug some code</button>
+        <button type="button" class="prompt-chip">Give me a fun fact</button>
+      </div>
     </div>`;
+  wirePromptChips();
 });
 
 // ---------- Auto-resize textareas ----------
@@ -69,7 +85,6 @@ function clearEmptyState(container) {
 
 function saveHistory() {
   try {
-    // Cap what we store so localStorage doesn't grow unbounded over time.
     const trimmed = chatHistory.slice(-40);
     localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(trimmed));
   } catch (err) {
@@ -82,21 +97,69 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(text));
 }
 
-function addCopyButton(bubble, getText) {
+function highlightCodeBlocks(container) {
+  if (typeof hljs === "undefined") return;
+  container.querySelectorAll("pre code").forEach((block) => {
+    hljs.highlightElement(block);
+  });
+}
+
+function addCopyButton(actionsRow, getText) {
   const btn = document.createElement("button");
-  btn.className = "copy-btn";
+  btn.className = "icon-action-btn";
   btn.type = "button";
   btn.setAttribute("aria-label", "Copy message");
-  btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
+  const copyIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
+  const checkIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+  btn.innerHTML = copyIcon;
   btn.addEventListener("click", () => {
     navigator.clipboard.writeText(getText()).then(() => {
-      btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>`;
-      setTimeout(() => {
-        btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
-      }, 1500);
+      vibrate(10);
+      btn.innerHTML = checkIcon;
+      setTimeout(() => { btn.innerHTML = copyIcon; }, 1500);
     });
   });
-  bubble.parentElement.appendChild(btn);
+  actionsRow.appendChild(btn);
+}
+
+function addSpeakButton(actionsRow, getText) {
+  if (!("speechSynthesis" in window)) return;
+  const btn = document.createElement("button");
+  btn.className = "icon-action-btn";
+  btn.type = "button";
+  btn.setAttribute("aria-label", "Read aloud");
+  const speakIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>`;
+  const stopIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+  btn.innerHTML = speakIcon;
+
+  btn.addEventListener("click", () => {
+    if (btn.classList.contains("speaking")) {
+      window.speechSynthesis.cancel();
+      btn.classList.remove("speaking");
+      btn.innerHTML = speakIcon;
+      return;
+    }
+    window.speechSynthesis.cancel();
+    document.querySelectorAll(".icon-action-btn.speaking").forEach((b) => {
+      b.classList.remove("speaking");
+      b.innerHTML = speakIcon;
+    });
+
+    const utterance = new SpeechSynthesisUtterance(getText());
+    utterance.onend = () => {
+      btn.classList.remove("speaking");
+      btn.innerHTML = speakIcon;
+    };
+    utterance.onerror = () => {
+      btn.classList.remove("speaking");
+      btn.innerHTML = speakIcon;
+    };
+    btn.classList.add("speaking");
+    btn.innerHTML = stopIcon;
+    window.speechSynthesis.speak(utterance);
+  });
+
+  actionsRow.appendChild(btn);
 }
 
 function addRegenerateButton(row) {
@@ -106,6 +169,18 @@ function addRegenerateButton(row) {
   btn.type = "button";
   btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v6h-6"/></svg> Regenerate`;
   btn.addEventListener("click", regenerateLast);
+  row.querySelector(".msg-wrap").appendChild(btn);
+}
+
+function addRetryButton(row, retryFn) {
+  const btn = document.createElement("button");
+  btn.className = "retry-btn";
+  btn.type = "button";
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v6h-6"/></svg> Retry`;
+  btn.addEventListener("click", () => {
+    row.remove();
+    retryFn();
+  });
   row.querySelector(".msg-wrap").appendChild(btn);
 }
 
@@ -121,9 +196,18 @@ function addMessage(role, text, imageDataUrl) {
   if (role === "assistant") {
     const span = document.createElement("span");
     span.className = "bubble-text";
-    if (text) span.innerHTML = renderMarkdown(text);
+    if (text) {
+      span.innerHTML = renderMarkdown(text);
+      highlightCodeBlocks(span);
+    }
     bubble.appendChild(span);
-    if (text) addCopyButton(bubble, () => text);
+    if (text) {
+      const actionsRow = document.createElement("div");
+      actionsRow.className = "bubble-actions";
+      row.querySelector(".msg-wrap").appendChild(actionsRow);
+      addCopyButton(actionsRow, () => text);
+      addSpeakButton(actionsRow, () => text);
+    }
   } else if (text) {
     const textNode = document.createElement("span");
     textNode.textContent = text;
@@ -159,6 +243,7 @@ async function typewriterReveal(span, fullText) {
     }, 15);
   });
   span.innerHTML = renderMarkdown(fullText);
+  highlightCodeBlocks(span);
 }
 
 function addThinkingBubble() {
@@ -196,13 +281,20 @@ async function performChatRequest(messagesForRequest, imageToSend) {
     thinkingRow.remove();
 
     if (!res.ok) {
-      addMessage("assistant", "Something went wrong. Please try again.");
+      lastFailedRequest = { messages: messagesForRequest, image: imageToSend };
+      const row = addMessage("assistant", "Something went wrong. Please try again.");
+      addRetryButton(row, () => performChatRequest(messagesForRequest, imageToSend));
     } else {
+      lastFailedRequest = null;
       const row = addMessage("assistant", "");
       const span = row.querySelector(".bubble-text");
-      const bubble = row.querySelector(".bubble");
       await typewriterReveal(span, data.reply);
-      addCopyButton(bubble, () => data.reply);
+      vibrate(12);
+      const actionsRow = document.createElement("div");
+      actionsRow.className = "bubble-actions";
+      row.querySelector(".msg-wrap").appendChild(actionsRow);
+      addCopyButton(actionsRow, () => data.reply);
+      addSpeakButton(actionsRow, () => data.reply);
       addRegenerateButton(row);
       chatHistory.push({ role: "assistant", content: data.reply });
       saveHistory();
@@ -212,7 +304,9 @@ async function performChatRequest(messagesForRequest, imageToSend) {
     if (err.name === "AbortError") {
       addMessage("assistant", "Stopped.");
     } else {
-      addMessage("assistant", "Couldn't reach the server. Is it running?");
+      lastFailedRequest = { messages: messagesForRequest, image: imageToSend };
+      const row = addMessage("assistant", "Couldn't reach the server. Is it running?");
+      addRetryButton(row, () => performChatRequest(messagesForRequest, imageToSend));
     }
   } finally {
     setSendingUI(false);
@@ -222,7 +316,6 @@ async function performChatRequest(messagesForRequest, imageToSend) {
 
 async function regenerateLast() {
   if (currentController || isTyping) return;
-  // Drop the last assistant reply from history and the UI, then re-ask.
   if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "assistant") {
     chatHistory.pop();
     saveHistory();
@@ -235,7 +328,7 @@ async function regenerateLast() {
 }
 
 async function sendChat() {
-  if (currentController || isTyping) return; // already busy — ignore extra submits
+  if (currentController || isTyping) return;
 
   const text = chatInput.value.trim();
   if (!text && !attachedImage) return;
@@ -244,6 +337,7 @@ async function sendChat() {
   chatInput.value = "";
   autoResize(chatInput);
   clearAttachment();
+  vibrate(10);
 
   addMessage("user", text, imageToSend);
   chatHistory.push({ role: "user", content: text || "(sent an image)" });
@@ -273,16 +367,19 @@ chatInput.addEventListener("keydown", (e) => {
 });
 
 // ---------- Prompt chips ----------
-document.querySelectorAll(".prompt-chip").forEach((chip) => {
-  chip.addEventListener("click", () => {
-    chatInput.value = chip.textContent;
-    autoResize(chatInput);
-    sendChat();
+function wirePromptChips() {
+  document.querySelectorAll(".prompt-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      chatInput.value = chip.textContent;
+      autoResize(chatInput);
+      sendChat();
+    });
   });
-});
+}
+wirePromptChips();
 
 // ---------- Image generation ----------
-function addImageCard(prompt) {
+function addImageCard() {
   clearEmptyState(imageGallery);
   const card = document.createElement("div");
   card.className = "image-card loading";
@@ -292,16 +389,39 @@ function addImageCard(prompt) {
   return card;
 }
 
-async function generateImage() {
-  const prompt = imageInput.value.trim();
-  if (!prompt) return;
+function renderImageResult(card, src, prompt, retryFn) {
+  card.innerHTML = `
+    <img src="${src}" alt="${prompt}" />
+    <div class="caption">
+      <span>${prompt}</span>
+      <button class="download-btn" type="button" aria-label="Download image">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      </button>
+    </div>`;
+  card.querySelector(".download-btn").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = "nivora-image.png";
+    a.click();
+    vibrate(10);
+  });
+}
 
-  imageInput.value = "";
-  autoResize(imageInput);
-  generateBtn.disabled = true;
+function renderImageError(card, message, retryFn) {
+  card.innerHTML = `<div class="caption"><span>${message}</span></div>`;
+  const retryBtn = document.createElement("button");
+  retryBtn.className = "retry-btn";
+  retryBtn.type = "button";
+  retryBtn.style.margin = "0 12px 12px";
+  retryBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v6h-6"/></svg> Retry`;
+  retryBtn.addEventListener("click", () => {
+    card.remove();
+    retryFn();
+  });
+  card.appendChild(retryBtn);
+}
 
-  const card = addImageCard(prompt);
-
+async function requestImage(prompt, card) {
   try {
     const res = await fetch("/api/image", {
       method: "POST",
@@ -309,21 +429,39 @@ async function generateImage() {
       body: JSON.stringify({ prompt }),
     });
     const data = await res.json();
-
     card.classList.remove("loading");
 
     if (!res.ok) {
-      card.innerHTML = `<div class="caption">Error: ${data.error || "image generation failed."}</div>`;
+      renderImageError(card, data.error || "Image generation failed.", () => {
+        const newCard = addImageCard();
+        requestImage(prompt, newCard);
+      });
     } else {
       const src = data.b64 ? `data:image/png;base64,${data.b64}` : data.url;
-      card.innerHTML = `<img src="${src}" alt="${prompt}" /><div class="caption">${prompt}</div>`;
+      renderImageResult(card, src, prompt);
+      vibrate(12);
     }
   } catch (err) {
     card.classList.remove("loading");
-    card.innerHTML = `<div class="caption">Couldn't reach the server. Is it running?</div>`;
-  } finally {
-    generateBtn.disabled = false;
+    renderImageError(card, "Couldn't reach the server. Is it running?", () => {
+      const newCard = addImageCard();
+      requestImage(prompt, newCard);
+    });
   }
+}
+
+async function generateImage() {
+  const prompt = imageInput.value.trim();
+  if (!prompt) return;
+
+  imageInput.value = "";
+  autoResize(imageInput);
+  generateBtn.disabled = true;
+  vibrate(10);
+
+  const card = addImageCard();
+  await requestImage(prompt, card);
+  generateBtn.disabled = false;
 }
 
 generateBtn.addEventListener("click", generateImage);
@@ -354,7 +492,6 @@ openSidebarBtn.addEventListener("click", openSidebar);
 closeSidebarBtn.addEventListener("click", closeSidebar);
 backdrop.addEventListener("click", closeSidebar);
 
-// Close the drawer after picking a mode, so it doesn't stay open over the content
 modeButtons.forEach((btn) => btn.addEventListener("click", closeSidebar));
 newChatBtn.addEventListener("click", closeSidebar);
 
@@ -382,7 +519,6 @@ systemMedia.addEventListener("change", () => {
   if (current === "system") applyTheme("system");
 });
 
-// Restore saved preference (defaults to dark)
 setTheme(localStorage.getItem("nivora-theme") || "dark");
 
 // ---------- Report a bug ----------
@@ -470,6 +606,7 @@ async function startRecording() {
 
     mediaRecorder.start();
     micBtn.classList.add("recording");
+    vibrate(10);
   } catch (err) {
     addMessage("assistant", "Couldn't access the microphone — check your browser permissions.");
   }
@@ -492,9 +629,7 @@ micBtn.addEventListener("click", () => {
 // ---------- PWA service worker ----------
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Non-critical — the app still works fine without it, just not installable.
-    });
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }
 
