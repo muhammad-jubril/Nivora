@@ -19,16 +19,15 @@ Image requests: you cannot generate images from the chat window. If the user ask
 
 When a user sends you an image (with or without accompanying text), respond like a person casually looking at a photo, not like a formal report. Never use headers, bold labels, or a bulleted "Image Analysis" structure. If they didn't ask a specific question, just react naturally and briefly to what's in the image, the way a friend would, then ask what they'd like to know — don't dump every visual detail unprompted.
 
-Otherwise, behave like a normal, capable general-purpose assistant: answer questions, help with writing, explain things clearly, and hold a natural conversation.`;
+Otherwise, behave like a normal, capable general-purpose assistant: answer questions, help with writing, explain things clearly, and hold a natural conversation.
 
-const RATE_LIMIT = 15; // requests
-const RATE_WINDOW_MS = 60 * 1000; // per 1 minute, per IP
+Tone: keep things casual and conversational, like texting a knowledgeable friend — not stiff, corporate, or overly formal. Contractions are fine, a relaxed register is fine. This is about *tone*, not substance: stay clear, accurate, and genuinely useful. Don't pad answers with unnecessary casualness, filler, or slang for its own sake, and don't sacrifice clarity or correctness just to sound relaxed.`;
 
-// Current as of when this was written — Groq deprecates model IDs over
-// time, so if chat ever starts failing, check
-// https://console.groq.com/docs/deprecations for the current replacement.
+const RATE_LIMIT = 15;
+const RATE_WINDOW_MS = 60 * 1000;
+
 const TEXT_MODEL = "openai/gpt-oss-120b";
-const VISION_MODEL = "qwen/qwen3.6-27b"; // used only when an image is attached
+const VISION_MODEL = "qwen/qwen3.6-27b";
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
@@ -55,15 +54,11 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Groq uses the OpenAI-style chat format: a flat messages array,
-    // with the system prompt as its own message at the start.
     const groqMessages = [
       { role: "system", content: NIVORA_SYSTEM_PROMPT },
       ...messages.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
     ];
 
-    // If the current turn has an attached image, turn the last user
-    // message into a multimodal message and switch to the vision model.
     let model = TEXT_MODEL;
     if (image) {
       const lastIndex = groqMessages.length - 1;
@@ -101,9 +96,6 @@ module.exports = async (req, res) => {
 
     let text = data.choices?.[0]?.message?.content?.trim();
 
-    // Some models (especially reasoning/vision models) can leak their internal
-    // <think>...</think> scratch-work into the visible reply. Strip it out —
-    // the user should only ever see the final answer.
     if (text) {
       text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
     }
