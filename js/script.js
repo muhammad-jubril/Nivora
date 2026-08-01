@@ -305,7 +305,7 @@ async function performChatRequest(messagesForRequest, imageToSend) {
       addMessage("assistant", "Stopped.");
     } else {
       lastFailedRequest = { messages: messagesForRequest, image: imageToSend };
-      const row = addMessage("assistant", "Couldn't reach the server. Is it running?");
+      const row = addMessage("assistant", "Something went wrong. Please try again.");
       addRetryButton(row, () => performChatRequest(messagesForRequest, imageToSend));
     }
   } finally {
@@ -443,7 +443,7 @@ async function requestImage(prompt, card) {
     }
   } catch (err) {
     card.classList.remove("loading");
-    renderImageError(card, "Couldn't reach the server. Is it running?", () => {
+    renderImageError(card, "Something went wrong. Please try again.", () => {
       const newCard = addImageCard();
       requestImage(prompt, newCard);
     });
@@ -595,7 +595,7 @@ async function startRecording() {
             addMessage("assistant", "Something went wrong. Please try again.");
           }
         } catch (err) {
-          addMessage("assistant", "Couldn't reach the server. Is it running?");
+          addMessage("assistant", "Something went wrong. Please try again.");
         } finally {
           chatInput.placeholder = "Message Nivora...";
           micBtn.disabled = false;
