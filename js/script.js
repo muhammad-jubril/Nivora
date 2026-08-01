@@ -182,7 +182,7 @@ function addRetryButton(row, retryFn) {
   row.querySelector(".msg-wrap").appendChild(btn);
 }
 
-function addMessage(role, text, imageDataUrl) {
+function addMessage(role, text, imageDataUrl, skipScroll) {
   clearEmptyState(messagesEl);
   const row = document.createElement("div");
   row.className = `msg-row ${role}`;
@@ -212,7 +212,9 @@ function addMessage(role, text, imageDataUrl) {
     bubble.appendChild(textNode);
   }
   messagesEl.appendChild(row);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (!skipScroll) {
+    row.scrollIntoView({ behavior: "smooth", block: role === "user" ? "start" : "nearest" });
+  }
   return row;
 }
 
@@ -222,7 +224,7 @@ function addThinkingBubble() {
   row.className = "msg-row assistant";
   row.innerHTML = `<div class="msg-wrap"><div class="bubble thinking-bubble"><span class="thinking-label">Nivora is thinking</span><div class="thinking"><span></span><span></span><span></span></div></div></div>`;
   messagesEl.appendChild(row);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  row.scrollIntoView({ behavior: "smooth", block: "nearest" });
   return row;
 }
 
@@ -613,8 +615,9 @@ window.addEventListener("load", () => {
     chatHistory = parsed;
     clearEmptyState(messagesEl);
     parsed.forEach((m) => {
-      addMessage(m.role === "assistant" ? "assistant" : "user", m.content);
+      addMessage(m.role === "assistant" ? "assistant" : "user", m.content, null, true);
     });
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   } catch (err) {
     // Corrupted or inaccessible storage — just start fresh.
   }
