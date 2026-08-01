@@ -269,6 +269,7 @@ body {
   display: none;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
 }
 
 .view.active {
@@ -342,6 +343,11 @@ body {
 
 /* ---- Rendered markdown inside assistant bubbles ---- */
 
+.bubble-text {
+  display: block;
+  min-width: 0;
+}
+
 .bubble-text p {
   margin: 0 0 10px;
 }
@@ -361,6 +367,8 @@ body {
   border-radius: 4px;
   font-family: "JetBrains Mono", monospace;
   font-size: 0.85em;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .bubble-text pre {
@@ -368,22 +376,44 @@ body {
   padding: 12px;
   border-radius: 10px;
   overflow-x: auto;
+  max-width: 100%;
   margin: 0 0 10px;
 }
 
 .bubble-text pre code {
   background: none;
   padding: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: pre;
 }
 
 .bubble-text a {
   color: var(--primary);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
-/* ---- Copy + regenerate buttons ---- */
+.bubble-text img {
+  max-width: 100%;
+}
 
-.copy-btn {
+.bubble-text table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ---- Copy + regenerate + speak + retry buttons ---- */
+
+.bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   margin-top: 4px;
+}
+
+.icon-action-btn {
   width: 26px;
   height: 26px;
   border-radius: 7px;
@@ -397,12 +427,16 @@ body {
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.copy-btn:hover {
+.icon-action-btn:hover {
   background: var(--panel-light);
   color: var(--text);
 }
 
-.regenerate-btn {
+.icon-action-btn.speaking {
+  color: var(--primary);
+}
+
+.regenerate-btn, .retry-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -417,7 +451,7 @@ body {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.regenerate-btn:hover {
+.regenerate-btn:hover, .retry-btn:hover {
   border-color: var(--primary);
   color: var(--text);
 }
@@ -427,6 +461,7 @@ body {
 .messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   padding: 76px 0 12px;
@@ -437,6 +472,7 @@ body {
   display: flex;
   padding: 6px 0;
   animation: messageIn 0.28s cubic-bezier(0.2, 0.6, 0.3, 1) both;
+  min-width: 0;
 }
 
 @keyframes messageIn {
@@ -464,6 +500,7 @@ body {
   width: 100%;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .msg-row.user .msg-wrap {
@@ -480,6 +517,10 @@ body {
   font-size: 0.95rem;
   line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .msg-row.user .bubble {
@@ -711,6 +752,36 @@ body {
   font-size: 0.85rem;
   color: var(--muted);
   border-top: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.image-card .caption span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.download-btn:hover {
+  border-color: var(--primary);
+  color: var(--text);
 }
 
 .image-card.loading {
