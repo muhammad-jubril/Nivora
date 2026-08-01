@@ -28,8 +28,6 @@ const micBtn = document.getElementById("micBtn");
 
 let attachedImage = null; // base64 data URL, or null
 let currentController = null; // AbortController for the in-flight chat request
-let isTyping = false; // whether the typewriter reveal is currently animating
-let skipTypewriter = false;
 let lastFailedRequest = null; // { messages, image } for the retry button
 
 // ---------- Haptics ----------
@@ -218,34 +216,6 @@ function addMessage(role, text, imageDataUrl) {
   return row;
 }
 
-async function typewriterReveal(span, fullText) {
-  isTyping = true;
-  skipTypewriter = false;
-  const chunkSize = 3;
-  let i = 0;
-  await new Promise((resolve) => {
-    const interval = setInterval(() => {
-      if (skipTypewriter) {
-        span.textContent = fullText;
-        clearInterval(interval);
-        isTyping = false;
-        resolve();
-        return;
-      }
-      i += chunkSize;
-      span.textContent = fullText.slice(0, i);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-      if (i >= fullText.length) {
-        clearInterval(interval);
-        isTyping = false;
-        resolve();
-      }
-    }, 15);
-  });
-  span.innerHTML = renderMarkdown(fullText);
-  highlightCodeBlocks(span);
-}
-
 function addThinkingBubble() {
   clearEmptyState(messagesEl);
   const row = document.createElement("div");
@@ -286,15 +256,8 @@ async function performChatRequest(messagesForRequest, imageToSend) {
       addRetryButton(row, () => performChatRequest(messagesForRequest, imageToSend));
     } else {
       lastFailedRequest = null;
-      const row = addMessage("assistant", "");
-      const span = row.querySelector(".bubble-text");
-      await typewriterReveal(span, data.reply);
+      const row = addMessage("assistant", data.reply);
       vibrate(12);
-      const actionsRow = document.createElement("div");
-      actionsRow.className = "bubble-actions";
-      row.querySelector(".msg-wrap").appendChild(actionsRow);
-      addCopyButton(actionsRow, () => data.reply);
-      addSpeakButton(actionsRow, () => data.reply);
       addRegenerateButton(row);
       chatHistory.push({ role: "assistant", content: data.reply });
       saveHistory();
@@ -315,7 +278,7 @@ async function performChatRequest(messagesForRequest, imageToSend) {
 }
 
 async function regenerateLast() {
-  if (currentController || isTyping) return;
+  if (currentController) return;
   if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "assistant") {
     chatHistory.pop();
     saveHistory();
@@ -328,7 +291,7 @@ async function regenerateLast() {
 }
 
 async function sendChat() {
-  if (currentController || isTyping) return;
+  if (currentController) return;
 
   const text = chatInput.value.trim();
   if (!text && !attachedImage) return;
@@ -349,10 +312,6 @@ async function sendChat() {
 function handleSendButtonClick() {
   if (currentController) {
     currentController.abort();
-    return;
-  }
-  if (isTyping) {
-    skipTypewriter = true;
     return;
   }
   sendChat();
