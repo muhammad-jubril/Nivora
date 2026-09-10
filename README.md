@@ -1,89 +1,202 @@
-# Nivora — Built by MJ
+Nivora — Built by MJ
 
-A branded AI assistant: chat + image generation, built on **Groq** (chat) and
-**Pollinations.ai** (images) — both genuinely free, no credit card, ever.
-Wrapped in your own product and UI. Users never see "Groq," "Llama,"
-"Pollinations," or any other AI lab — Nivora always identifies itself as
-created by MJ.
+Nivora is a branded multimodal AI assistant built to make AI feel fast, useful, and enjoyable to use.
 
-## What's inside
-## Getting your API key (Groq — free, no card, ever)
+It combines conversational AI, image understanding, voice transcription, and text-to-image generation inside a responsive web app and installable PWA.
 
-1. Go to **https://console.groq.com** and sign up with an email
-2. Click **"API Keys"** in the sidebar
-3. Click **"Create API Key"**, name it, copy it — starts with `gsk_...`
+«Built by MJ — Muhammad Jubril»
 
-That's the only key you need. **Image generation needs no key at all** — it
-uses Pollinations.ai, which is open with no signup.
+✨ Features
 
-**Free tier limits** (as of when this was written):
-- Chat (Groq, Llama 3.3 70B): ~14,400 requests/day, 30/minute — very generous
-- Images (Pollinations): shared anonymous access, roughly 1 request per 15
-  seconds across all anonymous users — this is the one soft spot; if it ever
-  feels slow, Pollinations also offers a free registered tier with higher
-  limits (still no payment) — see pollinations.ai
+- AI conversations — Multi-turn conversations powered by a server-side AI API.
+- Vision — Upload an image and ask Nivora to analyze or discuss it.
+- Image generation — Generate images from text prompts through a dedicated Image mode.
+- Voice input — Record a voice note and convert it to text before sending it to chat.
+- Conversation history — Recent conversations persist locally in the browser.
+- Markdown & code rendering — AI responses support formatted text and syntax-highlighted code.
+- Read aloud — Listen to AI responses using the browser's speech synthesis API.
+- Regenerate & retry — Regenerate responses or retry failed requests without restarting a conversation.
+- Light / dark / system themes — Appearance can be changed from the app sidebar.
+- Responsive UI — Designed for both desktop and mobile screens.
+- PWA support — Install Nivora as a standalone web application on supported devices.
+- Rate limiting — Server-side endpoints include lightweight per-IP request limiting.
 
-## Running it locally (before deploying)
+🧠 AI Architecture
 
-1. Install Node.js (v18+): https://nodejs.org
-2. Install the Vercel CLI: `npm install -g vercel`
-3. From the project folder, run: `vercel dev`
-4. Add a `.env` file in the project root with:
-5. Open the local URL it gives you (usually http://localhost:3000)
+Nivora keeps third-party API credentials on the server rather than exposing them in the browser.
 
-## Deploying: GitHub → Vercel, step by step
+┌──────────────────┐
+│ Nivora UI │
+│ HTML / CSS / JS │
+└────────┬─────────┘
+│
+┌─────────────┼─────────────┐
+│ │ │
+▼ ▼ ▼
+/api/chat /api/image /api/transcribe
+│ │ │
+▼ ▼ ▼
+Groq Pollinations Groq
+│ │
+Chat / Vision Whisper transcription
 
-**1. Push the project to GitHub**
-- Create a new repository on https://github.com/new
-- Push this project's files to it (via `git`, or by hand through GitHub's
-  web "Create new file" if you're on mobile)
+Current AI services
 
-**2. Import the project into Vercel**
-- Go to https://vercel.com, sign in with GitHub
-- Click "Add New" → "Project" → select your repo → "Import"
+Capability| Service / model
+Conversational AI| Groq — GPT-OSS 120B
+Image understanding| Groq — Qwen 3.6 27B
+Voice transcription| Groq — Whisper Large V3 Turbo
+Image generation| Pollinations
 
-**3. Add your API key before deploying**
-- Under "Environment Variables," add:
-  - `GROQ_API_KEY` → your Groq key
-- Make sure it's added for "Production"
+The frontend communicates with the application's serverless API routes rather than directly exposing the Groq API key.
 
-**4. Deploy**
-- Click "Deploy" — you'll get a live link like `nivora-ai.vercel.app`
+🛠 Tech Stack
 
-**5. Future updates**
-- Any push to `main` on GitHub automatically redeploys
+Frontend
 
-## Rate limiting
+- HTML
+- CSS
+- Vanilla JavaScript
+- Marked
+- DOMPurify
+- Highlight.js
 
-Both `/api/chat` and `/api/image` limit each visitor (by IP) to:
-- **Chat:** 15 messages per minute
-- **Images:** 4 generations per minute (kept modest since Pollinations'
-free anonymous tier is itself shared and rate-limited)
+Backend
 
-This protects your free daily quota from being burned through by one heavy
-user or a bot. Honest caveat: this uses in-memory counting per serverless
-instance, so it's not perfectly precise under heavy simultaneous traffic,
-but it stops realistic abuse for a portfolio-scale project. Adjust the
-numbers at the top of `api/chat.js` and `api/image.js`.
+- Vercel Serverless Functions
+- Node.js
+- Groq API
+- Pollinations image generation
 
-## How the "Nivora, by MJ" identity works
+Platform
 
-Every request to `/api/chat` sends a system prompt telling the model to
-behave as "Nivora," created by MJ, describe itself when asked "who are you,"
-and never reveal the underlying model or company. This is normal — most
-AI-powered products work this way under the hood.
+- Vercel
+- Progressive Web App APIs
+- Browser Local Storage
+- Web Speech API
+- MediaRecorder API
 
-## Customizing
+🔐 Security & Reliability
 
-- **Colors/branding:** CSS variables at the top of `css/style.css` (light +
-dark theme blocks)
-- **Nivora's personality/behavior:** `NIVORA_SYSTEM_PROMPT` in `api/chat.js`
-- **WhatsApp bug report number:** `WHATSAPP_NUMBER` in `js/script.js`
-- **Image style/size:** adjust the query params in `api/image.js`
+Nivora was designed with the API boundary in mind.
 
-## Next steps (not included yet)
+- API credentials are stored in environment variables.
+- Groq requests are made through server-side API routes.
+- Markdown generated by the model is sanitized before being rendered.
+- API methods are validated before processing.
+- Chat, image-generation, and transcription endpoints have request-rate limits.
+- Failed upstream requests return generic user-facing errors rather than exposing provider responses.
 
-- User accounts + saved chat history (e.g. via Supabase or Firebase)
-- Custom domain (Vercel → Project → Settings → Domains)
-- If this ever needs a higher, paid tier: swap in another provider later —
-the `/api` structure stays the same either way
+Current limitation
+
+The rate limiter uses in-memory state inside serverless functions. This means limits are not globally synchronized across every serverless instance.
+
+For a portfolio-scale deployment this provides useful basic protection, but a larger production deployment should use centralized rate limiting such as a shared Redis/KV-based store.
+
+📱 Progressive Web App
+
+Nivora includes:
+
+- Web app manifest
+- 192px and 512px app icons
+- Standalone display mode
+- Theme metadata
+- Service worker
+- Mobile-safe-area handling
+
+The current service worker provides the PWA foundation but does not attempt to provide full offline AI functionality.
+
+🚀 Running Locally
+
+Requirements
+
+- Node.js 18+
+- A Groq API key
+- Vercel CLI
+
+1. Clone the repository
+
+git clone https://github.com/muhammad-jubril/Nivora.git
+cd Nivora
+
+2. Install the Vercel CLI
+
+npm install -g vercel
+
+3. Add your environment variable
+
+Create a ".env" file in the project root:
+
+GROQ_API_KEY=your_groq_api_key
+
+Never commit your API key to GitHub.
+
+4. Run locally
+
+vercel dev
+
+Open the local URL provided by Vercel.
+
+☁️ Deployment
+
+Nivora is designed around a GitHub → Vercel deployment workflow.
+
+1. Push the repository to GitHub.
+2. Import the repository into Vercel.
+3. Add "GROQ_API_KEY" to the project's environment variables.
+4. Deploy.
+5. Future pushes to the connected branch can trigger automatic deployments.
+
+🎨 Customization
+
+Most product-level customization is intentionally straightforward.
+
+- Branding & themes: "css/style.css"
+- AI behavior: "api/chat.js"
+- Image generation: "api/image.js"
+- Voice transcription: "api/transcribe.js"
+- Rate limits: "api/_rateLimit.js"
+- Frontend behavior: "js/script.js"
+
+⚠️ Current Scope
+
+Nivora is currently a lightweight AI product rather than a full account-based AI platform.
+
+It does not currently include:
+
+- User accounts
+- Cloud-synced conversation history
+- Database-backed memory
+- Multi-user profiles
+- Model selection
+- Web search
+- Tool calling
+- Document processing
+- Persistent cloud image libraries
+- Full offline AI functionality
+
+Conversation history is currently stored locally in the user's browser.
+
+🔭 Possible Future Direction
+
+Potential future improvements include:
+
+- User authentication
+- Cloud-synced conversations
+- Persistent AI memory
+- Conversation search
+- File and document analysis
+- Model selection
+- Centralized rate limiting
+- More robust observability and error monitoring
+- Expanded AI tools and integrations
+
+👤 About
+
+Nivora is an independent project by Muhammad Jubril (MJ), a web developer and digital designer focused on building modern web experiences, applications, and digital products.
+
+The project explores what can be built by combining a carefully designed frontend with modern AI APIs and lightweight serverless infrastructure.
+
+---
+
+Nivora — Built by MJ.
